@@ -1,21 +1,21 @@
-from PIL import Image
-import numpy as np
-import time
-import sys
 import argparse
+import time
 
+import numpy as np
+from PIL import Image
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This is a segmentation program using mean-shift algorithm')
     parser.add_argument("filename")
     parser.add_argument("bandwidth", type=int)
+    parser.add_argument("stripe", type=int, default=40)
     parser.add_argument("--gaussian", action="store_true")
     parser.add_argument("--iterations", action="store", default=15)
     args = parser.parse_args()
     # print(args)
     filename = args.filename
     bandwidth = args.bandwidth
-    stripe = 40
+    stripe = args.stripe
     gaussian = args.gaussian
     iterations = args.iterations
     m = 1
@@ -64,7 +64,8 @@ if __name__ == "__main__":
     print("mean shift end for %.1f s" % (end_time - start_time))
 
     flags = [True for _ in means]
-    means = np.array(means)
+    means = np.array(means, dtype=np.float32)
+    print(means)
     converged_means = []
 
     for i, mean in enumerate(means):
