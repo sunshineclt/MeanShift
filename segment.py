@@ -1,8 +1,59 @@
 import argparse
+import multiprocessing as mp
 import time
 
 import numpy as np
 from PIL import Image
+
+from kernel import gaussian_mean
+
+
+def mean_shift(row, column):
+    now_row = min(int(row + np.random.random() * stripe), rows - 1)
+    now_column = min(int(column + np.random.random() * stripe), columns - 1)
+    now = np.array([now_row, now_column, *img[now_row, now_column]])
+    for iteration in range(iterations):
+        x = now[0]
+        y = now[1]
+        r1 = max(0, x - stripe)
+        r2 = min(x + stripe, rows)
+        c1 = max(0, y - stripe)
+        c2 = min(y + stripe, columns)
+        kernel_points = []
+        for i in range(r1, r2):
+            for j in range(c1, c2):
+                dc = np.linalg.norm(img[i][j] - now[2:])
+                ds = (np.linalg.norm(np.array([i, j]) - now[:2])) * m / S
+                D = np.linalg.norm([dc, ds])
+                if D < bandwidth:
+                    kernel_points.append([i, j, *img[i][j]])
+        kernel_points = np.array(kernel_points)
+        if gaussian:
+            mean = gaussian_mean(kernel, seed, bandwidth)
+        else:
+            mean = np.mean(kernel_points, axis=0, dtype=np.int32)
+
+        dc = np.linalg.norm(now[2:] - mean[2:])
+        ds = (np.linalg.norm(now[:2] - mean[:2])) * m / S
+        dsm = np.linalg.norm([dc, ds])
+        now = mean
+        if dsm <= threshold:
+            break
+    return now
+
+
+def draw_segemented(row, column):
+    min_dist = 1e10
+    label = -1
+    for c in range(len(converged_means)):
+        dc = np.linalg.norm(img[i][j] - converged_means[c][2:])
+        ds = (np.linalg.norm(np.array([i, j]) - converged_means[c][:2])) * m / S
+        D = np.linalg.norm([dc, ds])
+        if D < min_dist:
+            min_dist = D
+            label = c
+    return row, column, converged_means[label][2:]
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This is a segmentation program using mean-shift algorithm')
@@ -26,48 +77,24 @@ if __name__ == "__main__":
     segmented_image = img.copy()
     rows, columns, dim = img.shape
 
-    start_time = time.time()
-    print("mean shift start")
-    means = []
+    # Set up for multi-processing
+    pool = mp.Pool(processes=12)
+
+    # Mean Shift
+    condition = []
     for row in range(0, rows, stripe):
         for column in range(0, columns, stripe):
-            now_row = min(int(row + np.random.random() * stripe), rows - 1)
-            now_column = min(int(column + np.random.random() * stripe), columns - 1)
-            now = np.array([now_row, now_column, *img[now_row, now_column]])
-            for iteration in range(iterations):
-                x = now[0]
-                y = now[1]
-                r1 = max(0, x - stripe)
-                r2 = min(x + stripe, rows)
-                c1 = max(0, y - stripe)
-                c2 = min(y + stripe, columns)
-                kernel = []
-                for i in range(r1, r2):
-                    for j in range(c1, c2):
-                        dc = np.linalg.norm(img[i][j] - now[2:])
-                        ds = (np.linalg.norm(np.array([i, j]) - now[:2])) * m / S
-                        D = np.linalg.norm([dc, ds])
-                        if D < bandwidth:
-                            kernel.append([i, j, *img[i][j]])
-                kernel = np.array(kernel)
-                if not gaussian:
-                    mean = np.mean(kernel, axis=0, dtype=np.int32)
-
-                dc = np.linalg.norm(now[2:] - mean[2:])
-                ds = (np.linalg.norm(now[:2] - mean[:2])) * m / S
-                dsm = np.linalg.norm([dc, ds])
-                now = mean
-                if dsm <= threshold:
-                    break
-            means.append(now)
+            condition.append((row, column))
+    start_time = time.time()
+    print("mean shift start")
+    means = pool.map(mean_shift, condition)
     end_time = time.time()
     print("mean shift end for %.1f s" % (end_time - start_time))
-
-    flags = [True for _ in means]
     means = np.array(means, dtype=np.float32)
-    print(means)
-    converged_means = []
 
+    # Converge Means
+    flags = [True for _ in means]
+    converged_means = []
     for i, mean in enumerate(means):
         if flags[i]:
             w = 1.0
@@ -84,17 +111,9 @@ if __name__ == "__main__":
     converged_means = np.array(converged_means)
     print("means converged")
 
-    min_dist = np.zeros(shape=[rows, columns]) + 1e10
-    labels = np.zeros(shape=[rows, columns], dtype=np.int32) - 1
-    for i in range(rows):
-        for j in range(columns):
-            for c in range(len(converged_means)):
-                dc = np.linalg.norm(img[i][j] - converged_means[c][2:])
-                ds = (np.linalg.norm(np.array([i, j]) - converged_means[c][:2])) * m / S
-                D = np.linalg.norm([dc, ds])
-                if D < min_dist[i][j]:
-                    min_dist[i][j] = D
-                    labels[i][j] = c
-            segmented_image[i][j] = converged_means[labels[i][j]][2:]
+    # Draw Segmented Image
+    result = pool.map(draw_segemented, condition)
+    for i in result:
+        segmented_image[i[0]][i[1]] = i[2]
     segmented_image = Image.fromarray(segmented_image)
     segmented_image.save("%s_output_%s_%d.jpg" % (("gaussian" if gaussian else "uniform"), filename, bandwidth))
