@@ -87,7 +87,7 @@ if __name__ == "__main__":
             condition.append((row, column))
     start_time = time.time()
     print("mean shift start")
-    means = pool.map(mean_shift, condition)
+    means = pool.starmap(mean_shift, condition)
     end_time = time.time()
     print("mean shift end for %.1f s" % (end_time - start_time))
     means = np.array(means, dtype=np.float32)
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     print("means converged")
 
     # Draw Segmented Image
-    result = pool.map(draw_segemented, condition)
+    result = pool.starmap(draw_segemented, condition)
     for i in result:
         segmented_image[i[0]][i[1]] = i[2]
     segmented_image = Image.fromarray(segmented_image)
