@@ -76,7 +76,7 @@ if __name__ == "__main__":
                     means[index] += means[j]
                     w += 1.0
                     flags[j] = 0
-            means[i] /= w
+            means[index] /= w
             converged_means.append(means[i])
     converged_means = np.array(converged_means)
     print("means converged")
