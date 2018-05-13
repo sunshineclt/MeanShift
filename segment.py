@@ -69,6 +69,7 @@ if __name__ == "__main__":
     stripe = args.stripe
     gaussian = args.gaussian
     iterations = args.iterations
+    print("%s segmentation with bandwidth %d, %s kernel" % (filename, bandwidth, ("gaussian" if gaussian else "uniform")))
     m = 1
     S = 5
     threshold = 1.0
@@ -109,6 +110,7 @@ if __name__ == "__main__":
             means[i] /= w
             converged_means.append(means[i])
     converged_means = np.array(converged_means)
+    print("number of converged means is ", len(converged_means))
     print("means converged")
 
     # Draw Segmented Image
