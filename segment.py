@@ -29,7 +29,7 @@ def mean_shift(row, column):
                     kernel_points.append([i, j, *img[i][j]])
         kernel_points = np.array(kernel_points)
         if gaussian:
-            mean = gaussian_mean(kernel, seed, bandwidth)
+            mean = gaussian_mean(kernel_points, now, bandwidth)
         else:
             mean = np.mean(kernel_points, axis=0, dtype=np.int32)
 
