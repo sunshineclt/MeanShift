@@ -33,10 +33,10 @@ if __name__ == "__main__":
         for column in range(0, columns, stripe):
             now_row = min(int(row + np.random.random() * stripe), rows - 1)
             now_column = min(int(column + np.random.random() * stripe), columns - 1)
-            seed = np.array([now_row, now_column, *img[now_row, now_column]])
+            now = np.array([now_row, now_column, *img[now_row, now_column]])
             for iteration in range(iterations):
-                x = seed[0]
-                y = seed[1]
+                x = now[0]
+                y = now[1]
                 r1 = max(0, x - stripe)
                 r2 = min(x + stripe, rows)
                 c1 = max(0, y - stripe)
@@ -44,8 +44,8 @@ if __name__ == "__main__":
                 kernel = []
                 for i in range(r1, r2):
                     for j in range(c1, c2):
-                        dc = np.linalg.norm(img[i][j] - seed[2:])
-                        ds = (np.linalg.norm(np.array([i, j]) - seed[:2])) * m / S
+                        dc = np.linalg.norm(img[i][j] - now[2:])
+                        ds = (np.linalg.norm(np.array([i, j]) - now[:2])) * m / S
                         D = np.linalg.norm([dc, ds])
                         if D < bandwidth:
                             kernel.append([i, j, *img[i][j]])
@@ -53,13 +53,13 @@ if __name__ == "__main__":
                 if not gaussian:
                     mean = np.mean(kernel, axis=0, dtype=np.int32)
 
-                dc = np.linalg.norm(seed[2:] - mean[2:])
-                ds = (np.linalg.norm(seed[:2] - mean[:2])) * m / S
+                dc = np.linalg.norm(now[2:] - mean[2:])
+                ds = (np.linalg.norm(now[:2] - mean[:2])) * m / S
                 dsm = np.linalg.norm([dc, ds])
-                seed = mean
+                now = mean
                 if dsm <= threshold:
                     break
-            means.append(seed)
+            means.append(now)
     end_time = time.time()
     print("mean shift end for %.1f s" % (end_time - start_time))
 
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     print("means converged")
 
     min_dist = np.zeros(shape=[rows, columns]) + 1e10
-    labels = np.zeros(shape=[rows, columns]) - 1
+    labels = np.zeros(shape=[rows, columns], dtype=np.int32) - 1
     for i in range(rows):
         for j in range(columns):
             for c in range(len(converged_means)):
