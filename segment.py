@@ -8,7 +8,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This is a segmentation program using mean-shift algorithm')
     parser.add_argument("filename")
     parser.add_argument("bandwidth", type=int)
-    parser.add_argument("stripe", type=int, default=40)
+    parser.add_argument("--stripe", type=int, default=40)
     parser.add_argument("--gaussian", action="store_true")
     parser.add_argument("--iterations", action="store", default=15)
     args = parser.parse_args()
