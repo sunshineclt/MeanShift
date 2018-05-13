@@ -42,6 +42,19 @@ def mean_shift(row, column):
     return now
 
 
+def draw_segmented(row, column):
+    min_dist = 1e10
+    label = -1
+    for c in range(len(converged_means)):
+        dc = np.linalg.norm(img[row][column] - converged_means[c][2:])
+        ds = (np.linalg.norm(np.array([row, column]) - converged_means[c][:2])) * m / S
+        D = np.linalg.norm([dc, ds])
+        if D < min_dist:
+            min_dist = D
+            label = c
+    return row, column, converged_means[label][2:]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='This is a segmentation program using mean-shift algorithm')
     parser.add_argument("filename")
@@ -99,21 +112,15 @@ if __name__ == "__main__":
     print("means converged")
 
     # Draw Segmented Image
-    def draw_segmented(row, column):
-        min_dist = 1e10
-        label = -1
-        for c in range(len(converged_means)):
-            dc = np.linalg.norm(img[row][column] - converged_means[c][2:])
-            ds = (np.linalg.norm(np.array([row, column]) - converged_means[c][:2])) * m / S
-            D = np.linalg.norm([dc, ds])
-            if D < min_dist:
-                min_dist = D
-                label = c
-        return row, column, converged_means[label][2:]
-
-
+    pool = mp.Pool(processes=12)
+    condition = []
+    for row in range(0, rows):
+        for column in range(0, columns):
+            condition.append((row, column))
     result = pool.starmap(draw_segmented, condition)
     for i in result:
         segmented_image[i[0]][i[1]] = i[2]
     segmented_image = Image.fromarray(segmented_image)
     segmented_image.save("%s_output_%s_%d.jpg" % (("gaussian" if gaussian else "uniform"), filename, bandwidth))
+    end_time = time.time()
+    print("total time is %.1f s" % (end_time - start_time))
