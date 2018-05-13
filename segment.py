@@ -12,7 +12,7 @@ def mean_shift(row, column):
     now_row = min(int(row + np.random.random() * stripe), rows - 1)
     now_column = min(int(column + np.random.random() * stripe), columns - 1)
     now = np.array([now_row, now_column, *img[now_row, now_column]])
-    for iteration in range(iterations):
+    for _ in range(iterations):
         x = now[0]
         y = now[1]
         r1 = max(0, x - stripe)
@@ -43,6 +43,7 @@ def mean_shift(row, column):
 
 
 def draw_segmented(row, column):
+    global converged_means
     min_dist = 1e10
     label = -1
     for c in range(len(converged_means)):
