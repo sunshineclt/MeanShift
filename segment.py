@@ -84,8 +84,8 @@ if __name__ == "__main__":
     converged_means = np.array(converged_means)
     print("means converged")
 
-    min_dist = np.zeros(rows, columns) + 1e10
-    labels = np.zeros(rows, columns) - 1
+    min_dist = np.zeros(shape=[rows, columns]) + 1e10
+    labels = np.zeros(shape=[rows, columns]) - 1
     for i in range(rows):
         for j in range(columns):
             for c in range(len(converged_means)):
