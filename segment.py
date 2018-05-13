@@ -42,12 +42,12 @@ def mean_shift(row, column):
     return now
 
 
-def draw_segemented(row, column):
+def draw_segmented(row, column):
     min_dist = 1e10
     label = -1
     for c in range(len(converged_means)):
-        dc = np.linalg.norm(img[i][j] - converged_means[c][2:])
-        ds = (np.linalg.norm(np.array([i, j]) - converged_means[c][:2])) * m / S
+        dc = np.linalg.norm(img[row][column] - converged_means[c][2:])
+        ds = (np.linalg.norm(np.array([row, column]) - converged_means[c][:2])) * m / S
         D = np.linalg.norm([dc, ds])
         if D < min_dist:
             min_dist = D
@@ -112,7 +112,7 @@ if __name__ == "__main__":
     print("means converged")
 
     # Draw Segmented Image
-    result = pool.starmap(draw_segemented, condition)
+    result = pool.starmap(draw_segmented, condition)
     for i in result:
         segmented_image[i[0]][i[1]] = i[2]
     segmented_image = Image.fromarray(segmented_image)
