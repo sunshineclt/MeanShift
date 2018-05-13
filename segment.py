@@ -64,19 +64,21 @@ if __name__ == "__main__":
     print("mean shift end for %.1f s" % (end_time - start_time))
 
     flags = [True for _ in means]
+    means = np.array(means)
     converged_means = []
-    for index, mean in enumerate(means):
-        if flags[index]:
+
+    for i, mean in enumerate(means):
+        if flags[i]:
             w = 1.0
-            for j in range(index + 1, len(means)):
-                dc = np.linalg.norm(means[index][2:] - means[j][2:])
-                ds = (np.linalg.norm(means[index][:2] - means[j][:2])) * m / S
+            for j in range(i + 1, len(means)):
+                dc = np.linalg.norm(means[i][2:] - means[j][2:])
+                ds = (np.linalg.norm(means[i][:2] - means[j][:2])) * m / S
                 dsm = np.linalg.norm([dc, ds])
                 if dsm < bandwidth:
-                    means[index] += means[j]
+                    means[i] += means[j]
                     w += 1.0
                     flags[j] = 0
-            means[index] /= w
+            means[i] /= w
             converged_means.append(means[i])
     converged_means = np.array(converged_means)
     print("means converged")
