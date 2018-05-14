@@ -1,4 +1,4 @@
-image="input4"
+image="input1.jpg"
 echo ${image}
 python segment.py ${image} 10
 python segment.py ${image} 20

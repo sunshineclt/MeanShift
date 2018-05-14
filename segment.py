@@ -111,7 +111,6 @@ if __name__ == "__main__":
             converged_means.append(means[i])
     converged_means = np.array(converged_means)
     print("number of converged means is ", len(converged_means))
-    print("means converged")
 
     # Draw Segmented Image
     pool = mp.Pool(processes=12)
