@@ -1,4 +1,4 @@
-image="input4"
+image="input2.png"
 echo ${image}
 python segment.py ${image} 10 --gaussian
 python segment.py ${image} 20 --gaussian
