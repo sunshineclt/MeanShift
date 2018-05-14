@@ -26,19 +26,30 @@
 \section{Introduction}
 \label{sec:Introduction}
 \paragraph{}
-	\lettrine{N}{}owadays, application of computer vision has fulfilled our life: smart photo gallery, camera face auto-detect, robot path planning, etc. The main method behind these application is usually deep neural networks (NN). Since 2011, NN has become the super star for many artificial intelligence applications due to its impressive performance, including the computer vision field. Therefore, in this class project we'll use neural network model to solve a scene classification task.  
+	\lettrine{F}{}rom image classification, detection to segmentation, the task is getting harder and harder. Image classification only requires a label for the entire image, while detection requires the program to detect several objects with bounding box and label them separately. However, segmentation requires more precisely segment objects in the pixel level, i.e. to divide the pixels of image to several classes. It is clear the segmentation is much harder and has more computational burden. 
 
 \subsection{Task}
 \paragraph{}
-	Scene classification is the main task of the course homework, i.e. to detect the features of the image, and then recognize which scene is it. Specifically, this homework's database has 55999 training images in 80 classes, and the test set has 5000 images. The training images falling into each class is relatively balanced, with the minimum 212 images in class 55, and maximum 881 images in class 32. Most classes has image number between 500-700. This task has quite a bit difficulty that even people could not find the correct answer since the image is ambiguous. Moreover, the features of a scene is much harder to represent than an object. 
+	The task for this homework is image segmentation. As is said before, image segmentation requires the program to correctly divide image in the pixel level, labeling every pixel a class. For example, in the Fig. \ref{fig:segmentation}, the human is separated from sheep and sheep is separated from each other. 
+
+\begin{figure*}[t]
+	\centering
+	\includegraphics[width=\linewidth / 2]{graph/segmentation}
+	\caption{Segmentation Demonstration}
+	\label{fig:segmentation}
+\end{figure*}
 
 \subsection{Algorithm Review}
 \paragraph{}
-	The neural network architecture for scene classification is pretty similar with the object classification. As we all know, this area has the architecture from AlexNet, VGGNet to more complicated Inception and Resnet model. AlexNet \cite{krizhevsky2012imagenet} is the first modern neural network architecture successfully winning the IMAGENET 2011. After that, VGGNet \cite{simonyan2014very} goes deeper to more than 10 layers and achieve better performance. VGGNet is also the first widely-used neural networks for multiple tasks. Google introduced Inception Net using more layers \cite{szegedy2015going}, but the core of it is that each layer is a little module and consists of several path of convolution and pooling. More importantly, Google kept updating Inception Model with Inception V2, V3 and the latest V4. On the other hand, \citeauthor{he2016deep} introduced ResNet \cite{he2016deep} with residual link between layers and achieve better performance with less computation burden. These four architectures are so famous in computer vision domain that almost all the tasks use them as their basic architecture. 
-	
+	Researchers have proposed a lot of algorithms to tackle the hard image segmentation problem. We could divide them into two categories: classic and deep-learning method. 
+\paragraph{}
+	The classic algorithm includes unsupervised learning and interactive learning. In unsupervised learning algorithms, the "mean shift" \cite{comaniciu2002mean} and "Graph Cut" \cite{felzenszwalb2004efficient} algorithm is the most widely accepted algorithm. Mean shift is the main algorithm in this report and we will introduce it in the Section \ref{sec:Method}. "Graph Cut", however, is to model the image as an graph and use minimal flow in graph theory to solve a minimum graph cut in the image. Interactive learning means that user could interact with the program somehow, for example, draw a rough outline for image matting and then run segmentation algorithms using the sketch as a guide. The representative algorithm in interactive learning includes "Grab Cut" \cite{rother2004grabcut} and lazy-snapping \cite{li2004lazy}. 
+\paragraph{}
+	As deep learning develops, deep-learning based image segmentation algorithms have been brought forward and their performance has exceeded classic methods. The representative work includes FCN \cite{long2015fully}, SegNet \cite{badrinarayanan2017segnet} and DeepLab \cite{chen2018deeplab}. As the goal of this homework is to implement a classic algorithm, we won't explain deep algorithms here. 
+		
 \subsection{This Report}
 \paragraph{}
-	In this report, we introduced the task and some classic algorithms in Section \ref{sec:Introduction}. Then, we will explain the method we use, the difficulty we face and the solution to tackle these problems in Section \ref{sec:Method}. After that, we will show our algorithm's result in validation set. Finally we will have a discussion in Section \ref{sec:Discussion}. 
+	In this report, we introduced the task and some classic algorithms in Section \ref{sec:Introduction}. Then, we will explain the method we use, the difficulty we face and the solution to tackle these problems in Section \ref{sec:Method}. After that, we will show our algorithm's result. Finally we will have a discussion in Section \ref{sec:Discussion}. 
 	
 % ==========/Introduction=============
 
@@ -46,76 +57,170 @@
 % ==========Method=============
 \section{Method}
 \label{sec:Method}
-\paragraph{}
-	\lettrine{W}{}e mainly used the Inception-Resnet-V2 Architecture in this course homework, with some slight tricks in the training period. 
 		
-\subsection{Inception-Resnet-V2}
+\subsection{Mean Shift}
+\label{sec:mean shift}
 \paragraph{}
-	Inception-Resnet-V2 \cite{szegedy2017inception} is introduced by Google together with Inception-V4. The Inception-Resnet-V2 combined the Inception module (See Fig. \ref{fig:inception}) in Inception-V4 with the Residual link in Resnet. Because of the page restriction, I will not present the detailed Inception-Resnet-V2 here, but generally it is composed by many layers of residual Inception module. 
-		
-\begin{figure*}[htb]
+	Mean Shift algorithm is proposed by Comaniciu, Dorin and Meer, Peter in 2002 \cite{comaniciu2002mean}. It is a unsupervised algorithm, which means that it do not need training to find the structure of data, in this case, several clusters of pixels. The main idea of "Mean Shift" algorithm is to find several mode in the image, and points that converge to the same mode are considered as the same cluster. 
+\paragraph{}
+	Specifically, the algorithm contains two steps: 
+	\begin{enumerate}
+		\item Mode Search: In this step, we will try searching modes from several start points using mean shift. 
+		\item Mode Cluster: Combine near modes according to distance measure. 
+	\end{enumerate}
+\paragraph{}
+	Mode search is described as follows: 
+	\begin{enumerate}
+		\item Initialize $y_{i,0} = x_i$, $x_i$ is the i-th start point. The start point is chosen every $h_s$ row and $h_s$ column. Note that $x_i$ does not only contain location information but also the RGB value of that location. It is because mean shift should be performed on feature space, while in this task the feature space consists of location (x, y) and color (RGB). Thus, $x_i$ is a five length vector. 
+		\item Find all data points that satisfy the condition that ${\| \frac{z_j - y_{i,k}}{h} \|} <= bandwidth $, in which $bandwidth$ is a free parameter to control the bandwidth of "near" definition. It is worth noting that $h$ in the denominator indicates that adjustment for different dimensions in norm operation. For example, if the feature space contains coordination and color, it is obvious that they have different scales. Therefore, $h$ is a vector to make every dimension has the same scale. 
+		\item After filtering $z_j$, we need to calculate the new mean by $y_{i,k+1}=\frac{\sum_{n=1}^N{g(z_n)}}{N}$, i.e. regard the mean of all "nearby" $z_j$ as the new mean. The $g()$ function is a kernel function controlling the weight according to how far it is to the current mean when summed. 
+		\item If the new mean $y_{i,k+1}$ is very similar to the previous one $|y_{i,k+1} - y_{i,k}| <= bandwidth$, it means the iteration has converged, go to step 5, otherwise, go to step 2 and iterates again. 
+		\item Record the converged mean $y_{i,c}$. 
+	\end{enumerate}
+\paragraph{}
+	Mode Cluster is described as follows: for every converged mean $m_i$ that are not deleted, iterate all mean points $m_j$ and check their distance to $m_i$. The distance definition is the same as mode search: ${\| \frac{z_j - y_{i,k}}{h} \|}$. If the distance is lower than $bandwidth$, then delete $m_j$. 
+	
+\begin{figure*}[ht]
 	\centering
-	\includegraphics[width=\linewidth / 2]{graph/Inception}
-	\caption{Inception}
-	\label{fig:inception}
+	\subfigure[Input 1]{
+	\begin{minipage}[t]{0.48\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input1}
+	\end{minipage}
+	}
+	\subfigure[Input 2]{
+	\begin{minipage}[t]{0.48\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input2}	
+	\end{minipage}
+	}
+	\caption{Inputs}
+	\label{fig:input}
 \end{figure*}
 
 \subsection{Implementation}
+\label{sec:implementation}
 \paragraph{}
-	My code implementation is based on the code of \href{https://github.com/puke3615/SceneClassify}{https://github.com/puke3615/SceneClassify} with tensorflow and keras. I mainly modified the training process and add validation set while leaving the data augmentation unchanged. 
+	My code implementation is based on the code of \href{https://github.com/Pranshu258/meanshift}{https://github.com/Pranshu258/meanshift}. I mainly modified the calculation method of it (from serial to parallel), which will be explained in detail after. 
 \paragraph{}
 	To use my code, 
 	\begin{enumerate}
-		\item edit the "config.py" to adjust the path
-		\item run "DataTransformer.py" to organize the Raw Data to adjust to the requirement by the training process. Specifically, "DataTransformer.py" will organize the images under a directory of their classes. For exmaple, a class 14 image "011586.jpg" will be put under a directory named 14. Thus, after transformation, we will have 80 directories with images inside. Moreover, "DataTransformer.py" also divide the training set into training set (4/5) and validation set (1/5). Each set has 80 directories. 
-		\item run "ClassifierInceptionResnetV2.py" to train the network according to the training and the validation set configured in "config.py". It is worth mentioning that after epoch the model parameters will be automatically saved, and if the training is interrupted, you can just run "ClassifierInceptionResnetV2.py" again and it will restore the model parameters with best validation accuracy. 
-		\item After training, run "predictor.py" to predict the test image classes, and the test image path is also configured in "config.py". 
+		\item Choose one of $run\_uniform.sh$ or $run\_Gaussian.sh$. The former one's $g()$ is a uniform function while the latter one's $g()$ is a Gaussian function. 
+		\item Edit the $image="XXX"$ line in either $run\_uniform.sh$ or $run\_Gaussian.sh$ to adjust the path of the original image. 
+		\item Use linux style run $./run\_uniform.sh$ or $./run\_Gaussian.sh$ to run the code. 
+		\item It will automatically generate 8 images using bandwidth of 10, 20, 30, 40, 50, 60, 70, 80. 
 	\end{enumerate}
-	
+\paragraph{}
+	The mean shift module and mean cluster module's method is the same as described in Section \ref{sec:mean shift}. The scale adjuster $h$ is $(1, 1, 1/5, 1/5, 1/5)$, in correspondence to (x, y, R, G, B) in feature space. We will see the different $bandwidth$'s impact in Section \ref{sec:Result}. The starting point stride $h_s$ we use is 40 since the image size is approximately $400 \times 400$, and in this way we could generate 100 initial start points. The way we generate starting point is: for every $40 \times 40$ pixels, we will generate a random pixel as one of starting points. 
+\paragraph{}
+	To generate the segmented image, we will calculate the nearest converged mode for every pixel, and then fill that pixel's RGB for them. It is worth noting that this is not the best method. The best method should be calculate the converged modes for every pixel, but the computational burden that way is quite too much and I can't just get the result of it using my laptop. Therefore, the result may not that good compared with the correct method, but it is still showing significant segmentation success. 
 \subsection{Difficulty and Solution}
 \paragraph{}
 	Although it seems easy, I encounter many difficulties during the implementation and debugging. 
 	\begin{enumerate}
-		\item Fine-tune: since I used pretrained model (Imagenet pretrain), I need to fine-tune the parameters to adjust this problem. However, if I froze the last 50 layer parameters, I could only gain a training accuracy of about 50\% and the validation accuracy is only 10\%. It is an obvious under-training. Thus, I opened the limit to last 20 layers. In this way, I could gain a training accuracy of about 70\% and the validation accuracy is about 50\%. I want to unfreeze more layers, but my GTX 1080 card won't allow me since it has only 8G memory. Thus, I used another server with 4 TITAN X, whose memory is 12G each. I am able to unfreeze all the layers of the network to train on this new machine, and it ended up with much better results. 
-		\item Learning-rate: learning rate is a very sensitive parameters. If it is set too large, the training loss won't go down anyway. But if it is set too small, the training loss decreases too slow. Thus, I used a slowly-decreased pattern of the learning rate. The initial training was on the learning rate of $1e-3$, and after 4 epoches, the training and validation accuracy stops increasing at 75\% and 65\%. Then I turned the learning rate to $1e-4$, and after 8 epoches, the training and validation accuracy stops at 85\% and 75\%. Finally I turned the learning rate to $1e-5$, and after another 1 epoch, the training and validation accuracy stops at 90\% and 79\%. 
-		\item Architecture error: When reading keras's code for Inception-Resnet-V2 model, I found that although it is claimed as V2, the stem module uses the Inception-Resnet-V1 version (the Inception modules are correct). Maybe it is a bug in keras's code and I haven't had the time to fix it manually. 
-		\item Image Preprocessing: Since GPU is busy with neural network computing, we could use CPU's multiple cores to do some preprocessing for the image, such as resize, image augmentation. This parallelism is critical, since the preprocessing time is almost exactly the same as a batch learning for neural network. Thus, if it is not parallelized, the execution time will double. 
+		\item Parallelization: The maximum iteration times we set for each start point is 15, which means we may have to do 15 iterations for about 100 start points in the worst case. In fact, is takes me about 90s to get the result. What's worse, we will need to calculate the value for every pixel in the final segmented image drawing module, though we have done some simplification as mentioned in Section \ref{sec:implementation} to use nearest modes rather than the true converged modes. However, the program is well-parallelizable. We could easily use separate CPU core to do iterations for each 100 start points. We could also easily calculate the value for every pixel separately on separate CPU cores. After transforming the serial program into a parallel one, the mode search time decreases from 90s to 10s on a 12-core CPU. The drawing part's time decreases from I-don't-know to 70s. Since I want to do the comparison in different bandwidth, the decreased calculation time is really essential. 
+		\item Choose of image: because of the difficulty of the hard, choose of image is very important if you want to see good results. As a matter of fact, mean shift is just an unsupervised algorithm, which means that the data need to demonstrate a clear pattern for the algorithm to find because the algorithm does not know the exact answer. After trying, the rule of thumb I think is to choose images that has clear color separation is a better choice since we only use location and color in our feature space. Fig. \ref{fig:segmentation} is a good example since human, sheep and background's color are all clearly different. If the difference if mainly on texture, we may use a convolution filter to firstly get texture features and add them in the feature space. 
+		\item Bandwidth: bandwidth strongly influence the performance of the algorithm. In fact, larger bandwidth will cause unrelated modes to be combined, while smaller bandwidth will cause too much modes to have a good segmentation results. Thus, we tried different bandwidth in two images to see how bandwidth influence the segmentation result and what's the best bandwidth generally. 
 	\end{enumerate}
 	
 
 % ==========/Method=============
-\begin{figure*}[t]
-	\centering
-	\includegraphics[width=\linewidth / 2]{graph/learningcurve}
-	\caption{Learning Curve. There is several lines after 10k steps because the training of $1e-4$ learning rate continues, but I restore the params from 8th epoches with $1e-5$ learning rate to start another training. So, the bottom line is $1e-4$ learning rate, and the top line is $1e-5$ learning rate using the parameters from 8th epoches. }
-	\label{fig:learningcurve}
-\end{figure*}
 
 % ==========Result=============
 \section{Result}
 \label{sec:Result}
+\begin{figure*}[ht]
+	\centering
+	\subfigure[Uniform]{
+	\begin{minipage}[t]{0.8\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input1_bandwidth}
+	\end{minipage}
+	}
+	\subfigure[Gaussian]{
+	\begin{minipage}[t]{0.8\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input2_bandwidth}
+	\end{minipage}
+	}
+	\caption{Converged modes number in different Bandwidths}
+	\label{fig:bandwidth}
+\end{figure*}
+\begin{figure*}[ht]
+	\centering
+	\subfigure[Bandwidth=10]{
+	\begin{minipage}[t]{0.6\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/gaussian_output_input2_10}
+	\end{minipage}
+	}
+	\subfigure[Bandwidth=30]{
+	\begin{minipage}[t]{0.6\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/gaussian_output_input2_30}
+	\end{minipage}
+	}
+	\caption{Segmentation Result for Input 2 in Different Bandwidth}
+	\label{fig:different_bandwidth_input_2}
+\end{figure*}	
 \paragraph{}
-	\lettrine{U}{}sing the slowly-decreased learning rate and unfreezing all pretrained layers, I gained a training accuracy of 90.63\% and validation accuracy of 79.05\% \ref{fig:learningcurve}. I also tried other training method and listed the performance in Table \ref{table:result}. 
-			
+	\lettrine{W}{}e use two images to demonstrate the segmentation result. They are shown in Fig. \ref{fig:input}. We could see that the first image is harder than the second one because the second one's color separation is obvious while the first one's color on flowers and leaves is strongly influenced by light. 
 
+\paragraph{}
+	Firstly, we'd like to see how bandwidth will influence the segmentation result. Different converged modes numbers in different bandwidths is shown in Fig. \ref{fig:bandwidth}. Fig. \ref{fig:bandwidth}(a) uses uniform $g()$ in calculating the new mass mean, while Fig. \ref{fig:bandwidth}(b) uses Gaussian $g()$. We could see that in uniform $g()$, the bandwidth of 40 seems to be a turning point that after bigger bandwidth will result in no change of converged modes number. Nonetheless, in the Gaussian $g()$, the turning point is at the bandwidth of 30. Therefore, we regard the 40 is the best bandwidth for uniform $g()$ while 30 is the best bandwidth for Gaussian $g()$. We could also see the effect of different bandwidth in Fig \ref{fig:different_bandwidth_input_2}. 
 	
-\begin{table}[htb]
-\caption{Comparing result (lr = learning rate)}
-\label{table:result}
-\begin{tabular}{*{3}{c}}
-    \toprule 
-    \specialrule{0em}{2pt}{2pt}
-	Training Method & Validate Acc \\
-	\specialrule{0em}{2pt}{2pt}
-    \midrule
-    \multicolumn{1}{l}{50 layers freeze, lr=1e-4} & 10.57\% \\
-    \multicolumn{1}{l}{20 layers freeze, lr=1e-4} & 56.16\% \\
-    \multicolumn{1}{l}{no freeze, lr=1e-4} & 75.12\% \\
-    \multicolumn{1}{l}{no freeze, lr=1e-3, 1e-4, 1e-5} & 79.05\% \\
-    \bottomrule
-\end{tabular}
-\end{table}
-
+\begin{figure*}[ht]
+	\centering
+	\subfigure[Original]{
+	\begin{minipage}[t]{0.5\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input1}
+	\end{minipage}
+	}
+	\subfigure[Uniform]{
+	\begin{minipage}[t]{0.5\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/uniform_output_input1_40}
+	\end{minipage}
+	}
+	\subfigure[Gaussian]{
+	\begin{minipage}[t]{0.5\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/gaussian_output_input1_30}
+	\end{minipage}
+	}
+	\caption{Segmentation Result for Input 1}
+	\label{fig:input1_result}
+\end{figure*}
+\begin{figure*}[ht]
+	\centering
+	\subfigure[Original]{
+	\begin{minipage}[t]{0.6\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/input2}
+	\end{minipage}
+	}
+	\subfigure[Uniform]{
+	\begin{minipage}[t]{0.6\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/uniform_output_input2_40}
+	\end{minipage}
+	}
+	\subfigure[Gaussian]{
+	\begin{minipage}[t]{0.6\columnwidth}
+	\centering
+	\includegraphics[width=\textwidth]{graph/gaussian_output_input2_30}
+	\end{minipage}
+	}
+	\caption{Segmentation Result for Input 2}
+	\label{fig:input2_result}
+\end{figure*}
+\paragraph{}
+	We demonstrate our segmentation result for input1 in Fig. \ref{fig:input1_result}. It is obvious that both uniform and gaussian $g()$ successfully segment the image into 60+ classes. But as we said before, this image's color is highly influenced by light, which makes that flowers and leaves being separated into several classes. 
+\paragraph{}
+	In the segmentation result for input 2 (See Fig. \ref{fig:input2_result}), we could clearly see the kermesinus cylindrical building is successfully divided into three classes, from most bright to most dim. The grass is almost separated into the same class. Therefore, in order to make mean shift algorithm do its job better, we should pick images that different objects have different colors. 
+\paragraph{}
+	We could also see that gaussian segmentation is a little bit better than uniform segmentation, since it seems more smooth in both input1 and input2 figures. 
 % ==========/Result=============
 
 
@@ -123,12 +228,10 @@
 \section{Discussion}
 \label{sec:Discussion}
 \paragraph{}
-\lettrine{I}{}n this project, we learned basic concepts of scene classification, read several CV-related papers, implemented our own version of scene classification, using the architecture of Inception-Resnet-V2. I also gained a lot of experiences fine-tuning a pretrained model: If the GPU allows, unfreeze layers as more as possible and take special caution with learning rate. So the rule of thumb for choosing learning rate is: Start with larger learning rate, if it doesn't work, decrease it, and kept trying. 
-
+\lettrine{I}{}n this project, we learned the task of image segmentation, the idea of mean shift and implement our own version of mean shift algorithm. The algorithm works well in two representative images, though the result seems better in the second image because it is relatively easy because of the obvious color separation in different segments. Also, we demonstrate the difference when using different bandwidths in the separation. We conclude that for uniform mean calculation, bandwidth of 40 is better while for Gaussian mean calculation, bandwidth of 30 is better. We also parallelize the program to make it at least 10x faster than the original implementation. 
 \paragraph{} 
-	It is worth mentioning that scene classification is much harder than object classification. I look at some test pictures and even I don't know which class does it belong. For example, for the class of "basketball gym", an image is a normal basketball gym with higher viewpoint, including the whole gym. Another image, however, is three people defending one attacking people in near viewpoint, and almost the whole image consists of four people. How can an algorithm classify these two kinds of images into one class? Therefore, in my opinion, scene classification may not share the same feature of object classification, and the best neural network architecture for scene classification may be different. 
-
-		
+	However, our implementation still have several problems. For example, as said in Section \ref{sec:implementation}, we do not use every pixel's true convergence point to be its class, but use the nearest modes as its class to decrease the computational burden. In fact, the calculation could be further parallelized to make exact calculation possible. Moreover, we could also transform many calculation into matrix calculation to put them run on GPU to gain an even faster performance. Besides, mean shift is still only an unsupervised algorithm. Hence, the segmentation result is not very good compared to interactive algorithms or trained deep-learning algorithms. To make it better, the choose of feature space is essential. 
+			
 % ==========/Discuss and conclusion=============
 
 \section{Reference}
